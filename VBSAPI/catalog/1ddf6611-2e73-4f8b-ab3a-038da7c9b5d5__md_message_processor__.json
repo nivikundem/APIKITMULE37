@@ -1,0 +1,16 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "VBLoadList"
+        }
+    },
+    "outputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "JSONoutput"
+        }
+    },
+    "id": "1ddf6611-2e73-4f8b-ab3a-038da7c9b5d5",
+    "version": "5.2.0.0"
+}

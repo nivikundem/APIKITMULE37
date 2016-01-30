@@ -1,0 +1,11 @@
+{
+    "inputMessageMetadata": {
+        "messagePayload": {
+            "connectorName": "#_custom_mule_metadata_type_#",
+            "typeId": "VBLoadList"
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "31254fbe-d4e8-47c4-936d-faae88fd7248",
+    "version": "5.2.0.0"
+}

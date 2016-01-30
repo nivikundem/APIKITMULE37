@@ -1,0 +1,13 @@
+{
+    "inputMessageMetadata": {
+        "flowVariables": {
+            "DateBooked": {
+                "connectorName": "#_custom_mule_metadata_type_#",
+                "typeId": "DateBooked"
+            }
+        }
+    },
+    "outputMessageMetadata": {},
+    "id": "33a2c530-7974-4af6-a45f-c14eb20d9d56",
+    "version": "5.2.0.0"
+}

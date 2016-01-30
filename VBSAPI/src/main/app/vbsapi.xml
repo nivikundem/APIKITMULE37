@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <http:listener-config name="vbsapi-httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/>
+    <apikit:config name="vbsapi-config" raml="vbsapi.raml" consoleEnabled="true" consolePath="console" doc:name="Router"/>
+    <flow name="vbsapi-main">
+        <http:listener config-ref="vbsapi-httpListenerConfig" path="/api/*" doc:name="HTTP"/>
+        <apikit:router config-ref="vbsapi-config" doc:name="APIkit Router"/>
+        <exception-strategy ref="vbsapi-apiKitGlobalExceptionMapping" doc:name="Reference Exception Strategy"/>
+    </flow>    
+    
+    
+    <flow name="get:/vb/{VBR}/Delete:vbsapi-config">
+    
+    
+      <db:select config-ref="ESBDBDatabase" doc:name="Get Records">
+            <db:parameterized-query><![CDATA[SELECT TOP 1 [MessageData]
+		FROM [ESB].[VBSMessages]
+		 WHERE VBR=#[flowVars.VBR]]]></db:parameterized-query>
+
+        </db:select>
+        <expression-filter expression="#[payload !=[]]" doc:name="Only XmLList exists"/>
+
+    
+        <message-properties-transformer scope="invocation" doc:name="Flow Variables">			
+			<add-message-property key="DateGenerated" value="#[xpath3('string(//VBLoad/DateGenerated)',payload[0].MessageData)]"/>						
+			<add-message-property key="VRN" value="#[xpath3('string(//VBLoadList/VB/VRN)',payload[0].MessageData)]"/>			
+			<add-message-property key="DateBooked" value="#[xpath3('string(//VBLoadList/VB/DateBooked)',payload[0].MessageData)]"/>			
+			<add-message-property key="TimeBooked" value="#[xpath3('string(//VBLoadList/VB/TimeBooked)',payload[0].MessageData)]"/>			
+			<add-message-property key="Amount" value="#[xpath3('string(//VBLoadList/VB/Amount)',payload[0].MessageData)]"/>					
+		</message-properties-transformer>
+        <db:delete config-ref="ESBDBDatabase" doc:name="Delete records">
+            <db:parameterized-query><![CDATA[DELETE
+		FROM [ESB].[VBSMessages]
+		 WHERE VBR=#[flowVars.VBR]]]></db:parameterized-query>
+        </db:delete>
+        
+    
+        <dw:transform-message doc:name="SessionVarsToJSON" metadata:id="33a2c530-7974-4af6-a45f-c14eb20d9d56">
+            <dw:input-variable doc:sample="string.dwl" variableName="DateBooked"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	 "VBLoad":{
+	 	"DateGenerated" : flowVars.DateGenerated,
+	 	"VBLoadList" : {
+	 		"VB" : {
+	 		"VBR" :  flowVars.VBR,
+	 		"VRN" : flowVars.VRN,
+	 		"DateBooked" :  flowVars.DateBooked,
+	 		"TimeBooked" : flowVars.TimeBooked,
+	 		"Amount" :  flowVars.Amount
+	 		   }
+	 		}
+	 		
+	 	}
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        
+        <!-- <object-to-string-transformer doc:name="Object to String"/>
+        <logger level="INFO" doc:name="Logger"/>
+        --> 
+        
+        <!-- <set-payload value="&quot;VB&quot;: {&#xA;       &quot;VBR&quot;: &quot;100&quot;,&#xA;       &quot;VRN&quot;: &quot;A100&quot;,&#xA;        &quot;DateBooked&quot;: &quot;01-01-2016&quot;,&#xA;        &quot;TimeBooked&quot;: &quot;09:14&quot;,&#xA;        &quot;Amount&quot;: &quot;25.75&quot;&#x9;&#x9;&#x9;&#x9;           &#xA;        }" doc:name="Set Payload"/> -->
+   
+       <catch-exception-strategy doc:name="VBSAPI_Delete Catch Exception Strategy">
+		<message-properties-transformer scope="session" doc:name="Message Properties"> 
+		<add-message-property key="errorprocess" value="#['VBSAPI']"></add-message-property>  
+		<add-message-property key="errormessage" value="#['Delete API']"></add-message-property>  
+		<add-message-property key="erroradditionaltext" value="#[exception.cause.message]"></add-message-property> 
+		</message-properties-transformer>  
+		<vm:outbound-endpoint exchange-pattern="request-response" path="VBSAPI.queue.VMError" doc:name="VMError"></vm:outbound-endpoint>  		
+		</catch-exception-strategy> 
+   
+    </flow>
+    
+    
+    
+    <flow name="get:/GetAll:vbsapi-config">
+        <!-- <db:select config-ref="ESBDBDatabase" doc:name="Get Records">
+            <db:parameterized-query><![CDATA[SELECT [MessageData]
+		FROM [ESB].[VBSMessages]]]></db:parameterized-query>
+        </db:select> -->
+    
+       <message-properties-transformer scope="session" doc:name="Session Variables">			
+			<add-message-property key="xmlList" value="#[new ArrayList()]"/>			
+		</message-properties-transformer>
+    
+       <enricher target="#[sessionVars.xmlList]" doc:name="Message Enricher"> 
+       
+         <db:select config-ref="ESBDBDatabase" doc:name="Get Records">
+            <db:parameterized-query><![CDATA[SELECT [MessageData]
+		FROM [ESB].[VBSMessages]]]></db:parameterized-query>
+        </db:select>
+
+	   </enricher> 
+	
+        <expression-filter expression="#[sessionVars.xmlList !=[]]" doc:name="Only XmLList exists"/>
+        
+     <!--    <logger message="xmlList:::::#[sessionVars.xmlList]" level="INFO" doc:name="Logger"/> -->
+        
+        <component class="com.vbsapi.component.BuildJAXB" doc:name="Java"/>
+        <dw:transform-message metadata:id="31254fbe-d4e8-47c4-936d-faae88fd7248" doc:name="JavaToJSON">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+"VBLoad": {
+	"DateGenerated": payload.dateGenerated[0],
+	"VBLoadList": { (payload.*VBLoadList map {
+		"VB": {
+			"VBR": $.VB.VBR,
+			"VRN": $.VB.VRN,
+			"DateBooked": $.VB.dateBooked,
+			"TimeBooked": $.VB.timeBooked,
+			"Amount": $.VB.amount
+		}
+	  })
+		
+	  }
+}
+      ]]></dw:set-payload>
+        </dw:transform-message>
+        
+        
+         <catch-exception-strategy doc:name="VBSAPI_GetALL Catch Exception Strategy">
+		<message-properties-transformer scope="session" doc:name="Message Properties"> 
+		<add-message-property key="errorprocess" value="#['VBSAPI']"></add-message-property>  
+		<add-message-property key="errormessage" value="#['API Get All']"></add-message-property>  
+		<add-message-property key="erroradditionaltext" value="#[exception.cause.message]"></add-message-property> 
+		</message-properties-transformer>  
+		<vm:outbound-endpoint exchange-pattern="request-response" path="VBSAPI.queue.VMError" doc:name="VMError"></vm:outbound-endpoint>  		
+		</catch-exception-strategy> 
+
+   </flow>
+    
+    <flow name="get:/vb/{VBR}/vbrDetails:vbsapi-config">
+      <db:select config-ref="ESBDBDatabase" doc:name="GetByVBR">
+            <db:parameterized-query><![CDATA[SELECT TOP 1
+		      [MessageData]
+		  FROM [ESB].[VBSMessages]  MSG1 WITH(NOLOCK)
+		  WHERE VBR=#[flowVars.VBR]
+		  ORDER BY DateCreated DESC]]></db:parameterized-query>
+
+
+        </db:select>
+          <expression-filter expression="#[payload.size()&gt;0]" doc:name="GetAllOnly if rows"/>          
+         <set-payload value="#[payload[0].MessageData]" doc:name="Set Payload" mimeType="application/xml"/>   
+        <dw:transform-message doc:name="XMLtoJSON" metadata:id="790a2220-8769-408d-a1b5-40fd3c8dd379">
+            <dw:input-payload doc:sample="VBLoad_1.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+VBLoad: {
+				DateGenerated: payload.VBLoad.DateGenerated,
+				VBLoadList: {(payload.VBLoad.VBLoadList.*VB map {
+					VB:{
+						VBR: payload.VBLoad.VBLoadList.VB.@VBR,
+						VRN: $.VRN,
+						DateBooked: $.DateBooked,
+						TimeBooked: $.TimeBooked,
+						Amount: $.Amount
+					}
+					
+				})
+			}
+			}]]></dw:set-payload>
+        </dw:transform-message>        
+           
+            <catch-exception-strategy doc:name="VBSAPI_GetOne Catch Exception Strategy">
+		<message-properties-transformer scope="session" doc:name="Message Properties"> 
+		<add-message-property key="errorprocess" value="#['VBSAPI']"></add-message-property>  
+		<add-message-property key="errormessage" value="#['GetOne']"></add-message-property>  
+		<add-message-property key="erroradditionaltext" value="#[exception.cause.message]"></add-message-property> 
+		</message-properties-transformer>  
+		<vm:outbound-endpoint exchange-pattern="request-response" path="VBSAPI.queue.VMError" doc:name="VMError"></vm:outbound-endpoint>  		
+		</catch-exception-strategy> 
+           
+        <!-- <set-payload value="&quot;VB&quot;: {&#xA;       &quot;VBR&quot;: &quot;100&quot;,&#xA;       &quot;VRN&quot;: &quot;A100&quot;,&#xA;        &quot;DateBooked&quot;: &quot;01-01-2016&quot;,&#xA;        &quot;TimeBooked&quot;: &quot;09:14&quot;,&#xA;        &quot;Amount&quot;: &quot;25.50&quot;&#x9;&#x9;&#x9;&#x9;&#x9;           &#xA;        }" doc:name="Set Payload"/> -->
+    </flow>
+    
+    
+    <flow name="post:/postOperation:vbsapi-config">
+        <db:insert config-ref="ESBDBDatabase" doc:name="InsertVBR">
+            <db:parameterized-query><![CDATA[Insert into  [ESB].[VBSMessages] (VBR,Source,Target,ErrorText)
+Values( #[message.inboundProperties.'http.query.params'.VBR], 'API', 'API', 'VBS')]]></db:parameterized-query>
+        </db:insert>
+        <dw:transform-message metadata:id="340db667-67e7-468d-8dec-9adb2ee45f30" doc:name="QueryParamToJSON">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	VBLoad: {
+		VBLoadList: {
+			VB: {
+				VBR: inboundProperties."http.query.params".VBR,
+				VRN: inboundProperties."http.query.params".VRN,
+				Amount: inboundProperties."http.query.params".Amount
+			}
+		}
+}
+}]]></dw:set-payload>
+        </dw:transform-message>
+      <!--   <object-to-string-transformer doc:name="Object to String"/>
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+       
+       
+        <set-payload value="&quot;VB&quot;: {&#xA;          &quot;VBR&quot;: &quot;100&quot;,&#xA;          &quot;VRN&quot;: &quot;A100&quot;,&#xA;           &quot;DateBooked&quot;: &quot;01-01-2016&quot;,&#xA;           &quot;TimeBooked&quot;: &quot;09:14&quot;,&#xA;           &quot;Amount&quot;: &quot;25.50&quot;&#x9;&#x9;&#x9;&#x9;&#x9;           &#xA;           }" doc:name="Set Payload"/>
+    -->
+   
+   
+    <catch-exception-strategy doc:name="VBSAPI_POST Catch Exception Strategy">
+		<message-properties-transformer scope="session" doc:name="Message Properties"> 
+		<add-message-property key="errorprocess" value="#['VBSAPI']"></add-message-property>  
+		<add-message-property key="errormessage" value="#['VBSAPI Post']"></add-message-property>  
+		<add-message-property key="erroradditionaltext" value="#[exception.cause.message]"></add-message-property> 
+		</message-properties-transformer>  
+		<vm:outbound-endpoint exchange-pattern="request-response" path="VBSAPI.queue.VMError" doc:name="VMError"></vm:outbound-endpoint>  		
+		</catch-exception-strategy> 
+    </flow>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    <apikit:mapping-exception-strategy name="vbsapi-apiKitGlobalExceptionMapping">
+        <apikit:mapping statusCode="404">
+            <apikit:exception value="org.mule.module.apikit.exception.NotFoundException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Resource not found&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="405">
+            <apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="415">
+            <apikit:exception value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="406">
+            <apikit:exception value="org.mule.module.apikit.exception.NotAcceptableException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="400">
+            <apikit:exception value="org.mule.module.apikit.exception.BadRequestException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property"/>
+            <set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; }" doc:name="Set Payload"/>
+        </apikit:mapping>
+    </apikit:mapping-exception-strategy>
+</mule>
