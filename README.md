@@ -25,7 +25,7 @@ Mule components
 6.	VM Inbound/Outbound
 7.	Object-to-string-transformer
 8.	jaxb-xml-to-object-transformer
-9.	REST client
+9.	REST webservice
 10.  Exception Strategies
 
 
